@@ -14,10 +14,17 @@ git clone https://github.com/abhaydesu/fovea-demo.git
 cd fovea-demo
 ```
 
-### 2. Install Prerequisites (Ubuntu / Debian)
+### 2. Install Prerequisites
+
+**Ubuntu / Debian**:
 ```bash
 sudo apt update
 sudo apt install -y clang llvm libbpf-dev cmake pkg-config bpftool build-essential iproute2 linux-headers-$(uname -r)
+```
+
+**Arch Linux**:
+```bash
+sudo pacman -S clang llvm libbpf cmake pkgconf bpf base-devel iproute2 linux-headers
 ```
 
 *(Optional: Run `./scripts/check_dependencies.sh` to confirm your kernel version and headers are ready).*
