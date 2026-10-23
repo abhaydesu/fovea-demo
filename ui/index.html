@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fovea · Payload observability</title>
+    <meta name="description" content="Zero-instrumentation payload observability for microservices, built on eBPF." />
+  </head>
+  <body>
+    <header class="nav" id="nav">
+      <div class="nav-inner">
+        <a class="logo" href="#top"><span class="logo-mark" aria-hidden="true"></span>fovea</a>
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#problem">Problem</a>
+          <a href="#how">How it works</a>
+          <a href="#anatomy">Anatomy</a>
+          <a href="#objectives">Objectives</a>
+        </nav>
+        <div class="nav-right">
+          <a class="btn btn-dark" href="/app.html">Open live dashboard <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </header>
+
+    <main class="frame" id="top">
+      <!-- HERO -->
+      <section class="hero">
+        <span class="hero-gradient" aria-hidden="true"></span>
+        <svg class="hero-rings" viewBox="0 0 1440 860" aria-hidden="true">
+          <g fill="none" stroke="#fff">
+            <circle cx="720" cy="-40" r="260" stroke-opacity=".10" />
+            <circle cx="720" cy="-40" r="420" stroke-opacity=".08" />
+            <circle cx="720" cy="-40" r="600" stroke-opacity=".06" />
+            <circle cx="720" cy="-40" r="800" stroke-opacity=".045" />
+            <circle cx="720" cy="-40" r="1020" stroke-opacity=".03" />
+          </g>
+        </svg>
+        <div class="hero-content">
+          <a class="badge" href="#objectives">
+            <span class="badge-label">Final-year project · ISE, DSCE · 2026–27</span>
+            <span class="badge-divider" aria-hidden="true"></span>
+            <span class="badge-link">See progress</span>
+          </a>
+          <h1 class="title">
+            <span class="title-line">See every request.</span>
+            <span class="title-line title-line-2">Change no code.</span>
+          </h1>
+          <p class="subtitle">
+            Fovea uses eBPF to capture the real HTTP requests and JSON responses flowing between
+            microservices, straight from the kernel, and tells you why a call failed.
+          </p>
+          <div class="hero-ctas">
+            <a class="btn btn-hero" href="/app.html">Open live dashboard</a>
+            <a class="btn btn-ghost" href="#how">How it works</a>
+          </div>
+        </div>
+
+        <!-- product preview: latest captured failure (live if the agent is running) -->
+        <div class="preview" aria-label="Captured transaction preview">
+          <div class="preview-shell">
+            <div class="preview-card">
+              <div class="preview-top">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="preview-title" id="pv-title">orders → inventory</span>
+                <span class="preview-tag" id="pv-tag">sample</span>
+              </div>
+              <div class="preview-grid">
+                <div>
+                  <div class="pv-label">Request</div>
+                  <div class="pv-line"><b id="pv-method">POST</b> <span id="pv-path">/reserve</span></div>
+                  <pre id="pv-req">{
+  "item": "widget",
+  "qty": 50
+}</pre>
+                </div>
+                <div>
+                  <div class="pv-label">Response</div>
+                  <div class="pv-line"><b class="err" id="pv-status">500</b> <span id="pv-dur">0.11 ms</span></div>
+                  <pre class="pv-err" id="pv-resp">{
+  "error": "insufficient stock",
+  "item": "widget",
+  "available": 3,
+  "requested": 50
+}</pre>
+                </div>
+              </div>
+              <div class="preview-foot">
+                <span class="pulse" aria-hidden="true"></span>
+                <span id="pv-foot">Captured by eBPF at both ends of the connection · no SDK, no sidecar, no code changes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STACK STRIP -->
+      <section class="stack">
+        <h2>Built with the cloud-native<br />observability stack</h2>
+        <ul class="stack-list">
+          <li>eBPF</li><li>libbpf CO-RE</li><li>Go</li><li>React</li><li>Docker</li>
+          <li class="soon" title="next phase">Kubernetes</li><li class="soon" title="next phase">Cilium · Hubble</li>
+        </ul>
+      </section>
+
+      <!-- PROBLEM -->
+      <section class="section" id="problem">
+        <div class="section-head">
+          <p class="eyebrow">The problem</p>
+          <h2 class="h2">
+            <span>Flow tools tell you a call failed.</span>
+            <span class="muted-line">They can't tell you why.</span>
+          </h2>
+          <p class="lead">
+            Tracing frameworks need code in every service. eBPF tools like Cilium and Hubble need none,
+            but they only see network metadata: who talked to whom, ports, bytes. The message that
+            explains the failure is invisible.
+          </p>
+        </div>
+        <div class="compare">
+          <article class="card">
+            <div class="card-head"><span class="chip chip-gray">Flow metadata</span><span class="card-sub">what a flow view shows (illustrative)</span></div>
+            <pre class="mono dim">orders:41488  →  inventory:8082
+TCP   ESTABLISHED   FORWARDED
+5 packets · 812 bytes · 0.4 ms</pre>
+            <p class="card-note">You know <b>which</b> hop broke. You don't know what it said.</p>
+          </article>
+          <article class="card card-accent">
+            <div class="card-head"><span class="chip chip-blue">Fovea</span><span class="card-sub">what Fovea reconstructs from the same connection</span></div>
+            <pre class="mono">POST /reserve  {"item":"widget","qty":50}
+← <span class="err">500</span>  {"error":"<span class="hl">insufficient stock</span>",
+         "available":3, "requested":50}</pre>
+            <p class="card-note">The root cause, in the payload, at the hop where it originated.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- HOW (dark) -->
+      <section class="section dark" id="how">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2 class="h2">
+            <span>Four stages.</span>
+            <span><span class="grad">Zero</span> code changes.</span>
+          </h2>
+        </div>
+        <div class="steps">
+          <article class="step">
+            <span class="step-n">01</span>
+            <h3>Capture</h3>
+            <p>eBPF tracepoints on <code>read</code>, <code>write</code>, <code>sendmsg</code> and friends copy socket bytes at the syscall boundary. Filtered in-kernel to the workloads' cgroups.</p>
+          </article>
+          <article class="step">
+            <span class="step-n">02</span>
+            <h3>Reassemble</h3>
+            <p>A Go agent stitches chunks into complete HTTP/1.1 messages, pairs each request with its response and merges the client and server views into one call.</p>
+          </article>
+          <article class="step">
+            <span class="step-n">03</span>
+            <h3>Correlate</h3>
+            <p>Processes and IPs resolve to service names. Payloads join their network flow by 4-tuple, and calls chain into a request path with the root cause flagged.</p>
+          </article>
+          <article class="step">
+            <span class="step-n">04</span>
+            <h3>Explore</h3>
+            <p>A web UI shows the live service map, every network flow and the exact messages exchanged, with credentials and PII redacted.</p>
+          </article>
+        </div>
+
+        <figure class="pipeline">
+          <svg viewBox="0 0 1000 210" role="img" aria-label="Pipeline: services, kernel eBPF, agent, collector, web UI">
+            <defs>
+              <linearGradient id="g-edge" x1="0" x2="1">
+                <stop offset="0" stop-color="#76d0f4" /><stop offset="1" stop-color="#4d90fd" />
+              </linearGradient>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4d90fd" /></marker>
+            </defs>
+            <g class="pl-box"><rect x="10" y="30" width="170" height="150" rx="14" /><text x="95" y="62" class="pl-h">Services</text>
+              <text x="95" y="96" class="pl-t">frontend</text><text x="95" y="122" class="pl-t">orders</text><text x="95" y="148" class="pl-t">inventory</text></g>
+            <g class="pl-box pl-kernel"><rect x="230" y="30" width="200" height="150" rx="14" /><text x="330" y="62" class="pl-h">Linux kernel</text>
+              <text x="330" y="96" class="pl-t">syscall tracepoints</text><text x="330" y="122" class="pl-t">TC flow counters</text><text x="330" y="148" class="pl-t">ring buffer</text></g>
+            <g class="pl-box"><rect x="480" y="30" width="200" height="150" rx="14" /><text x="580" y="62" class="pl-h">Fovea agent</text>
+              <text x="580" y="96" class="pl-t">HTTP reassembly</text><text x="580" y="122" class="pl-t">pairing · dedup</text><text x="580" y="148" class="pl-t">service identity</text></g>
+            <g class="pl-box"><rect x="730" y="30" width="260" height="150" rx="14" /><text x="860" y="62" class="pl-h">Collector + UI</text>
+              <text x="860" y="96" class="pl-t">service map · call chains</text><text x="860" y="122" class="pl-t">flows ⇄ payloads</text><text x="860" y="148" class="pl-t">live stream (SSE)</text></g>
+            <g stroke="url(#g-edge)" stroke-width="2" marker-end="url(#arr)">
+              <line x1="182" y1="105" x2="226" y2="105" /><line x1="432" y1="105" x2="476" y2="105" /><line x1="682" y1="105" x2="726" y2="105" />
+            </g>
+            <text x="330" y="202" class="pl-cap">no code in the services</text>
+          </svg>
+        </figure>
+      </section>
+
+      <!-- ANATOMY: isometric machine of the pipeline, driven by a simulated request cycle -->
+      <section class="section anat-section" id="anatomy">
+        <div class="section-head">
+          <p class="eyebrow">Anatomy</p>
+          <h2 class="h2">
+            <span>One request, through the machine.</span>
+            <span class="muted-line">Every part is a real component.</span>
+          </h2>
+          <p class="lead">
+            The demo's three services sit at the back, the kernel in the middle and the Fovea agent at the front.
+            Watch a call get copied, queued, rebuilt and explained. Hover a part, or tap a number, to see what it does.
+          </p>
+        </div>
+
+        <div class="anat">
+          <figure class="anat-figure">
+            <svg class="anat-svg" role="img" aria-label="Isometric machine: services on a back terrace send packets along pipes; taps copy each chunk down into a dark kernel terrace, through a filter gate into a glowing ring buffer; the agent on the front terrace drains it, presses chunks into whole calls, links them on a correlator and stacks them beside a dashboard screen."></svg>
+            <figcaption class="anat-caption">
+              <span class="anat-now">Now</span>
+              <span data-r="caption" aria-live="polite">frontend calls orders. To the kernel it is just a socket write.</span>
+            </figcaption>
+          </figure>
+
+          <aside class="anat-side">
+            <div class="anat-readout" aria-label="Readout of the simulated cycle">
+              <div class="anat-ro-head">
+                <span>Simulated cycle</span>
+                <div class="anat-ctl">
+                  <button class="btn" data-a="fail" title="make the next request fail at inventory">Inject failure</button>
+                  <button class="btn" data-a="play" aria-pressed="false">Pause</button>
+                </div>
+              </div>
+              <dl>
+                <div><dt>Packets on the wire</dt><dd data-r="inflight">0</dd></div>
+                <div><dt>Bytes copied by eBPF</dt><dd data-r="bytes">0 B</dd></div>
+                <div><dt>Ring buffer</dt><dd data-r="ring">0 / 12</dd></div>
+                <div><dt>Calls reconstructed</dt><dd data-r="calls">0</dd></div>
+                <div><dt>Root causes flagged</dt><dd data-r="roots" class="bad">0</dd></div>
+              </dl>
+              <p class="anat-note">These numbers come from the same model that moves the figure. The live counters below come from the real agent.</p>
+            </div>
+
+            <ol class="anat-legend">
+              <li data-part="1" tabindex="0"><span class="anat-n">1</span><div><b>Services</b><small>Unmodified Go services. They only make normal socket calls.</small></div></li>
+              <li data-part="2" tabindex="0"><span class="anat-n">2</span><div><b>Syscall hooks</b><small>eBPF on <code>read</code>, <code>write</code> and <code>sendmsg</code> copies each chunk with its connection 4-tuple.</small></div></li>
+              <li data-part="3" tabindex="0"><span class="anat-n">3</span><div><b>Flow counter</b><small>A TC program counts packets and bytes per connection. This is the Hubble-style metadata.</small></div></li>
+              <li data-part="4" tabindex="0"><span class="anat-n">4</span><div><b>cgroup filter</b><small>Only the watched workloads pass. Every other process is dropped inside the kernel.</small></div></li>
+              <li data-part="5" tabindex="0"><span class="anat-n">5</span><div><b>Ring buffer</b><small>The kernel-to-agent queue. If it overflows, events are counted as dropped, never silently lost.</small></div></li>
+              <li data-part="6" tabindex="0"><span class="anat-n">6</span><div><b>Reassembler</b><small>The Go agent stitches chunks into whole HTTP calls and merges both ends of each one.</small></div></li>
+              <li data-part="7" tabindex="0"><span class="anat-n">7</span><div><b>Correlator</b><small>Calls are linked into a chain. The deepest failing hop becomes the root cause.</small></div></li>
+              <li data-part="8" tabindex="0"><span class="anat-n">8</span><div><b>Dashboard</b><small>Service map, call list and the exact payloads, with secrets redacted.</small></div></li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <!-- LIVE NUMBERS -->
+      <section class="numbers" id="live">
+        <div class="numbers-copy">
+          <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> <span id="live-state">Live from this machine</span></p>
+          <h2 class="h2"><span>Running right now.</span><span class="muted-line">Not a mock-up.</span></h2>
+          <p class="lead">These counters come straight from the agent's API. Send some traffic and watch them move.</p>
+          <a class="btn btn-dark" href="/app.html">Open live dashboard <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="numbers-grid">
+          <div class="num"><span class="num-v" data-k="calls">—</span><span class="num-l">HTTP calls reconstructed</span></div>
+          <div class="num"><span class="num-v" data-k="services">—</span><span class="num-l">services discovered</span></div>
+          <div class="num"><span class="num-v" data-k="events">—</span><span class="num-l">kernel events captured</span></div>
+          <div class="num"><span class="num-v" data-k="errors">—</span><span class="num-l">failed calls explained</span></div>
+        </div>
+      </section>
+
+      <!-- OBJECTIVES -->
+      <section class="section" id="objectives">
+        <div class="section-head">
+          <p class="eyebrow">Objectives</p>
+          <h2 class="h2"><span>Where the project stands.</span><span class="muted-line">Honestly.</span></h2>
+        </div>
+        <ol class="objectives">
+          <li><span class="obj-n">1</span><p>Zero-instrumentation observability system for microservices using eBPF</p><span class="st st-done">Working</span></li>
+          <li><span class="obj-n">2</span><p>Capture and reconstruct HTTP requests and JSON responses from kernel-level communication</p><span class="st st-done">Working</span></li>
+          <li><span class="obj-n">3</span><p>Automatically identify and map communication flows between microservices</p><span class="st st-done">Working</span></li>
+          <li><span class="obj-n">4</span><p>Correlate captured payloads with their network flows and service calls</p><span class="st st-part">Working · own flow layer, Hubble next</span></li>
+          <li><span class="obj-n">5</span><p>Unified web interface for service maps, network flows and exchanged payloads</p><span class="st st-done">Working</span></li>
+          <li><span class="obj-n">6</span><p>Deploy and evaluate the prototype in a Kubernetes-based microservice environment</p><span class="st st-next">Next phase</span></li>
+          <li><span class="obj-n">7</span><p>Measure payload reconstruction accuracy and CPU and latency overhead</p><span class="st st-part">Harness built · numbers in progress</span></li>
+        </ol>
+      </section>
+
+
+      <!-- CTA -->
+      <section class="cta">
+        <div class="cta-panel">
+          <div class="cta-inner" aria-hidden="true"></div>
+          <div class="cta-copy">
+            <h2 class="cta-title">
+              <span>Ready to look inside?</span>
+              <span class="cta-soft">See it on live traffic.</span>
+            </h2>
+            <div class="cta-btns">
+              <a class="btn btn-white" href="/app.html">Open live dashboard</a>
+              <a class="btn btn-outline" href="#anatomy">Watch it work</a>
+            </div>
+          </div>
+          <svg class="cta-art" viewBox="0 0 520 340" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+            <defs>
+              <clipPath id="cta-clip"><rect x="0" y="0" width="520" height="340" /></clipPath>
+            </defs>
+            <g clip-path="url(#cta-clip)" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1">
+              <path d="M0 85H520M0 170H520M0 255H520M104 0V340M208 0V340M312 0V340M416 0V340" />
+              <g stroke-opacity=".4">
+                <circle cx="208" cy="255" r="40" />
+                <circle cx="208" cy="255" r="96" stroke-opacity=".3" />
+                <circle cx="208" cy="255" r="170" stroke-opacity=".22" />
+                <circle cx="208" cy="255" r="250" stroke-opacity=".16" />
+              </g>
+              <circle cx="208" cy="255" r="11" stroke-opacity=".7" />
+              <path d="M208 235V275M188 255H228" stroke-opacity=".55" />
+              <path d="M208 255L312 170L416 85" stroke-opacity=".5" stroke-dasharray="3 5" />
+            </g>
+            <rect x="204" y="251" width="8" height="8" fill="#76d0f4" />
+            <rect x="308" y="166" width="8" height="8" fill="#fff" fill-opacity=".85" />
+            <rect x="412" y="81" width="8" height="8" fill="#ffd4be" />
+          </svg>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div>
+          <a class="logo" href="#top"><span class="logo-mark" aria-hidden="true"></span>fovea</a>
+          <p>Zero-instrumentation payload observability for debugging and root-cause analysis in microservices.</p>
+        </div>
+        <div class="footer-cols">
+          <div><h4>Project</h4><a href="#problem">Problem</a><a href="#how">How it works</a><a href="#objectives">Objectives</a><a href="/app.html">Live dashboard</a></div>
+          <div><h4>Related work</h4>
+            <span>Chou et al., eBPF-Based Network Monitoring Platform on Kubernetes, ICCCI 2024</span>
+            <span>Wang et al., Analyzing and Monitoring Kubernetes Microservices based on Distributed Tracing and Service Mesh, APSEC 2022</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">Dayananda Sagar College of Engineering, Bengaluru · Final-year project 2026–27</div>
+    </footer>
+
+    <script type="module" src="/src/landing.js"></script>
+  </body>
+</html>

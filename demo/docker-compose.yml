@@ -1,0 +1,18 @@
+# Plain HTTP/1.1 microservices. No tracing/instrumentation code anywhere.
+# Binaries are built on the host (scripts/run_demo.sh) and run FROM scratch,
+# so no registry access is needed at demo time.
+services:
+  frontend:
+    build: {context: ., dockerfile: Dockerfile, args: {SVC: frontend}}
+    container_name: fovea-frontend
+    environment: {ORDERS_URL: "http://orders:8081"}
+    ports: ["8080:8080"]
+    depends_on: [orders]
+  orders:
+    build: {context: ., dockerfile: Dockerfile, args: {SVC: orders}}
+    container_name: fovea-orders
+    environment: {INVENTORY_URL: "http://inventory:8082"}
+    depends_on: [inventory]
+  inventory:
+    build: {context: ., dockerfile: Dockerfile, args: {SVC: inventory}}
+    container_name: fovea-inventory
